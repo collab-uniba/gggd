@@ -17,6 +17,7 @@ gggd is a tool to download raw mbox content for all posts in a Google Group
 
 import sys
 import os
+import time
 
 from os.path import expanduser
 
@@ -152,10 +153,11 @@ class GroupInformation(object):
         self.fetch_content()
     
     def fetch_topics(self, page_limit=None):
-        global verbose
+        global verbose, timeout
         if verbose: print "Fetching topics ..."
         next_page = "https://groups.google.com/forum/?_escaped_fragment_=forum/%s" % self.group_name
         while next_page and page_limit is None or page_limit > 0:
+            if timeout: time.sleep(timeout)
             if verbose: print "Fetching %s" % next_page
             header, data = self._fetch_x(next_page, list_only=True)
             if header.code != 200:
@@ -181,9 +183,10 @@ class GroupInformation(object):
         return next_page
     
     def fetch_messages(self):
-        global verbose
+        global verbose, timeout
         if verbose: print "Fetching messages ..."
         for topic in self.topics.keys():
+            if timeout: time.sleep(timeout)
             self.fetch_messages_topic(topic)
     
     def fetch_messages_topic(self, topic):
@@ -203,10 +206,11 @@ class GroupInformation(object):
                 if verbose: print "Discovered %s" % parts[1]
     
     def fetch_content(self):
-        global verbose
+        global verbose, timeout
         for topic in self.topics.keys():
             if verbose: print "Retrieving message contents for topic %s ..." % topic
             for message in self.topics[topic].keys():
+		if timeout: time.sleep(timeout)
                 message_url = "https://groups.google.com/forum/message/raw?msg=%s/%s/%s" % (self.group_name, topic, message)
                 if self.topics[topic][message] is None:
                     if verbose: print "Fetching %s" % message_url
@@ -339,7 +343,7 @@ class CLIError(Exception):
 
 def main(argv=None): # IGNORE:C0111
     '''Command line options.'''
-    global verbose, batch_mode
+    global verbose, batch_mode, timeout
     
     if argv is None:
         argv = sys.argv
@@ -367,6 +371,7 @@ USAGE
     try:
         # Setup argument parser
         parser = ArgumentParser(description=program_license, formatter_class=RawDescriptionHelpFormatter)
+        parser.add_argument("-w", "--wait", help="set throttle timeout [default: %(default)s]", default=None, type=int)
         parser.add_argument("-v", "--verbose", action="count", help="set verbosity level [default: %(default)s]")
         parser.add_argument('-V', '--version', action='version', version=program_version_message)
         parser.add_argument("-t", "--topic-page-limit", help="Number of topic overview pages to process, usually at 20 topics per page", default=None, type=int)
@@ -396,6 +401,7 @@ USAGE
         
         group = args.group
         verbose = args.verbose
+        timeout = args.wait
         batch_mode = args.batch_mode
         
         lynx_cfg = args.lynx_cfg
